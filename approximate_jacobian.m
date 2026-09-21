@@ -34,11 +34,12 @@ function J = approximate_jacobian(fun,X)
         %the result should be a vector quantity
 
         %YOUR CODE HERE
+        partialvector = (fun(X + dX)-fun(X - dX))/(2 * dx_scalar);
 
         %Set the nth column of J to dfun/dx_n
 
         %YOUR CODE HERE
-
+        J(:,n) = partialvector;
 
         dX(n) = 0; %reset the dx vector to [0,...,0]^T
     end
