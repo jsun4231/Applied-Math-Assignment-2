@@ -8,15 +8,25 @@
 %vertex_coords_root: a column vector containing the (x,y) coordinates of every vertex
 %                    these coords satisfy all the kinematic constraints!
 function vertex_coords_root = compute_coords(vertex_coords_guess, leg_params, theta)
-    %your code here
-
     %you will likely need to make a wrapper function of linkage_error_func
-    %so that it is only a function of vertex_coords 
+    %so that it is only a function of vertex_coords
     %(and not leg_params or theta, which should be set beforehand)
     %you can then pass this wrapper function to your multidimensional Newton
     %solver, along with vertex_coords_guess to find the vertex coordinates
-    %corresponding to the legal configuration of the linkage, 
+    %corresponding to the legal configuration of the linkage,
     %given the values set for leg_params and theta
+    error_func = @(vertex_coords) linkage_error_func(vertex_coords,leg_params,theta);
+
+    solver_params = struct();
+    solver_params.ftol = 1e-9;
+
+    [vertex_coords_root,exit_flag] = multi_newton_solver(...
+        error_func,vertex_coords_guess,solver_params);
+
+    %make sure the returned coordinates satisfy the constraints
+    if exit_flag<=0 || norm(error_func(vertex_coords_root))>solver_params.ftol
+        error('Newton solver did not converge at theta = %g.',theta);
+    end
 end
 
 %Error function that encodes all necessary linkage constraints
@@ -46,15 +56,25 @@ end
 %          importantly, leg_params.link_lengths is a list of linakge lengths
 %          and leg_params.link_to_vertex_list is a two column matrix where
 %          leg_params.link_to_vertex_list(i,1) and
-%          leg_params.link_to_vertex_list(i,2) are the pair of vertices connected 
+%          leg_params.link_to_vertex_list(i,2) are the pair of vertices connected
 %          by the ith link in the mechanism
 %OUTPUTS:
-%length_errors: a column vector describing the current distance error of the ith 
+%length_errors: a column vector describing the current distance error of the ith
 %               link specifically, length_errors(i) = (xb-xa)^2 + (yb-ya)^2 - d_i^2
 %               where (xa,ya) and (xb,yb) are the coordinates of the vertices that
 %               are connected by the ith link, and d_i is the length of the ith link
 function length_errors = link_length_error_func(vertex_coords, leg_params)
-    %your code here
+    coords = column_to_matrix(vertex_coords);
+    length_errors = zeros(leg_params.num_linkages,1);
+
+    for linkage_index = 1:leg_params.num_linkages
+        vertex_a = leg_params.link_to_vertex_list(linkage_index,1);
+        vertex_b = leg_params.link_to_vertex_list(linkage_index,2);
+
+        delta = coords(vertex_b,:)-coords(vertex_a,:);
+        length_errors(linkage_index) = sum(delta.^2)...
+            -leg_params.link_lengths(linkage_index)^2;
+    end
 end
 
 %Error function that encodes the fixed vertex constraints
@@ -68,8 +88,11 @@ end
 %theta: the current angle of the crank
 %OUTPUTS:
 %coord_errors:  a column vector of height four corresponding to the differences
-%               between the current values of (x1,y1),(x2,y2) and 
+%               between the current values of (x1,y1),(x2,y2) and
 %               the fixed values that they should be
 function coord_errors = fixed_coord_error_func(vertex_coords, leg_params, theta)
-    %your code here
+    vertex_pos1 = leg_params.vertex_pos0...
+        +leg_params.crank_length*[cos(theta);sin(theta)];
+
+    coord_errors = vertex_coords(1:4)-[vertex_pos1;leg_params.vertex_pos2];
 end
