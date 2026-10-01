@@ -17,17 +17,16 @@ function strandbeest_simulation()
     ];
 
     %set the number of cycles and frames in the animation
-    num_cycles = 3;
+    num_cycles = 5;
     num_frames = 180;
     frame_rate = 30;
     theta_list = linspace(0,2*pi,num_frames+1);
     crank_speed = 2*pi*frame_rate/num_frames;
-    velocity_scale = 0.25;
+    velocity_scale = 0.5; %constant time scale for the velocity arrow
 
     %compute one complete cycle of positions and theta derivatives
     vertex_coords_list = zeros(2*leg_params.num_vertices,num_frames+1);
     dVdtheta_list = zeros(2*leg_params.num_vertices,num_frames+1);
-    dVdtheta_numerical = zeros(2*leg_params.num_vertices,num_frames+1);
 
     for n = 1:num_frames+1
         theta = theta_list(n);
@@ -38,8 +37,6 @@ function strandbeest_simulation()
         vertex_coords_guess = vertex_coords;
 
         dVdtheta_list(:,n) = compute_velocities(vertex_coords,leg_params,theta);
-        position_func = @(angle) compute_coords(vertex_coords,leg_params,angle);
-        dVdtheta_numerical(:,n) = approximate_jacobian(position_func,theta);
     end
 
     %initialize the current figure and save as object
@@ -51,8 +48,9 @@ function strandbeest_simulation()
         'position',[0 0 1440 1080],'color','w','resize','off');
 
     %set equal scaling and fixed axis limits
-    hold on; axis equal;
+    hold on;
     axis([-120,30,-110,45]);
+    axis equal;
     axis manual;
     box on; grid on;
     set(gca,'TickLabelInterpreter','latex','fontsize',18);
@@ -71,6 +69,8 @@ function strandbeest_simulation()
     plot([leg_params.vertex_pos0(1),leg_params.vertex_pos2(1)],...
         [leg_params.vertex_pos0(2),leg_params.vertex_pos2(2)],...
         'bo','markerfacecolor','b','markersize',8);
+
+    %the zero scale disables automatic scaling of the velocity arrow
     velocity_plot = quiver(0,0,0,0,0,'color',[0,0.5,0],...
         'linewidth',2,'MaxHeadSize',1);
     legend([tip_path,velocity_plot],{'Foot path','Tip velocity (scaled)'},...
@@ -82,9 +82,14 @@ function strandbeest_simulation()
     writerObj.Quality = 100;
     open(writerObj);
 
-    %animate multiple cycles without repeating the endpoint frame
+    %animate five complete cycles, including the final endpoint
     for cycle_index = 1:num_cycles
-        for n = 1:num_frames
+        last_frame = num_frames;
+        if cycle_index==num_cycles
+            last_frame = num_frames+1;
+        end
+
+        for n = 1:last_frame
             vertex_coords = vertex_coords_list(:,n);
             update_leg_drawing(vertex_coords,leg_drawing,leg_params);
 
@@ -104,30 +109,5 @@ function strandbeest_simulation()
     %close the video file after all frames have been written
     close(writerObj);
 
-    %compare the two methods of computing the leg tip derivatives
-    figure(2); clf;
-    plot(theta_list,dVdtheta_list(end-1,:),'b-','linewidth',2);
-    hold on;
-    plot(theta_list,dVdtheta_numerical(end-1,:),'r--','linewidth',2);
-    grid on; box on;
-    xlim([0,2*pi]);
-    set(gca,'TickLabelInterpreter','latex','fontsize',14);
-    title('Leg Tip Horizontal Derivative','interpreter','latex');
-    xlabel('$\theta$ (rad)','interpreter','latex');
-    ylabel('$dx_{tip}/d\theta$ (-/rad)','interpreter','latex');
-    legend({'Constraint Jacobian','Finite differences'},...
-        'interpreter','latex','location','best');
-
-    figure(3); clf;
-    plot(theta_list,dVdtheta_list(end,:),'b-','linewidth',2);
-    hold on;
-    plot(theta_list,dVdtheta_numerical(end,:),'r--','linewidth',2);
-    grid on; box on;
-    xlim([0,2*pi]);
-    set(gca,'TickLabelInterpreter','latex','fontsize',14);
-    title('Leg Tip Vertical Derivative','interpreter','latex');
-    xlabel('$\theta$ (rad)','interpreter','latex');
-    ylabel('$dy_{tip}/d\theta$ (-/rad)','interpreter','latex');
-    legend({'Constraint Jacobian','Finite differences'},...
-        'interpreter','latex','location','best');
+    fprintf('Saved strandbeest_animation.avi: %d complete cycles.\n',num_cycles);
 end
